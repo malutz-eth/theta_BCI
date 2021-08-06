@@ -128,7 +128,7 @@ class DataInlet(Inlet):
                 y_raw = np.hstack((old_y[old_offset:], y[new_offset:, ch_ix] - ch_ix))
 
                 #filtering of the data in the recomanded range
-                y_raw_filtered = band_pass_filter(y_raw, 4, 20, self.sr, self.filter_order)
+                y_raw_filtered = band_pass_filter(y_raw, 1, 20, self.sr, self.filter_order)
                 y_filtered = band_pass_filter(y_raw, self.lcut, self.hcut, self.sr, self.filter_order)
 
                 #self.curve_processed[ch_ix].setData(ts_axis, y_raw)
