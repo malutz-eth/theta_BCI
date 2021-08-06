@@ -18,7 +18,7 @@ import sys
 
 from pyqtgraph.Qt import QtCore, QtGui
 from typing import List
-from scipy.signal import butter, lfilter
+from scipy.signal import butter, lfilter, sosfilt
 
 
 class Inlet:
@@ -72,8 +72,8 @@ class DataInlet(Inlet):
         self.buffer = np.empty(bufsize, dtype=self.dtypes[info.channel_format()])
         empty = np.array([])
         # create one curve object for each channel/line that will handle displaying the data
-        self.curves = [pg.PlotCurveItem(x=empty, y=empty, autoDownsample=True, pen=(1)) for _ in range(self.channel_count)]
-        self.curve_filt = [pg.PlotCurveItem(x=empty, y=empty, autoDownsample=True,pen=(0))]
+        self.curves = [pg.PlotCurveItem(x=empty, y=empty, autoDownsample=True, pen=(0.001)) for _ in range(self.channel_count)]
+        self.curve_filt = [pg.PlotCurveItem(x=empty, y=empty, autoDownsample=True,pen=(3),width=5)]
         self.curve_processed = [pg.PlotCurveItem(x=empty, y=empty, autoDownsample=True)]
 
         plt.addItem(self.curves[0])
@@ -111,7 +111,7 @@ class DataInlet(Inlet):
             for ch_ix in range(self.channel_count):
                 # we don't pull an entire screen's worth of data, so we have to
                 # trim the old data and append the new data to it
-                old_x, old_y = self.curves[ch_ix].getData()
+                old_x, old_y = self.curves[0].getData()
 
                 # the timestamps are identical for all channels, so we need to do
                 # this calculation only once
@@ -123,9 +123,9 @@ class DataInlet(Inlet):
                     # can be shown at once
                     new_offset = ts.searchsorted(plot_time)
                     # append new timestamps to the trimmed old timestamps
-                    ts_axis = np.hstack((old_x[old_offset:], ts[new_offset:]))
+                    ts_axis = np.hstack((old_x[1:], ts[new_offset:]))
                 # append new data to the trimmed old data
-                y_raw = np.hstack((old_y[old_offset:], y[new_offset:, ch_ix] - ch_ix))
+                y_raw = np.hstack((old_y[1:], y[new_offset:, ch_ix] - ch_ix))
 
                 #filtering of the data in the recomanded range
                 y_raw_filtered = band_pass_filter(y_raw, 1, 20, self.sr, self.filter_order)
