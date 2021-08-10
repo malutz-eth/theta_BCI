@@ -1,0 +1,50 @@
+import tkinter as tk
+import os
+
+def main_gui():
+    window = tk.Tk()
+    window.geometry("1000x800")
+
+    def open_BrainAmpLSL():
+        path = os.path.normpath("C:/Users/schlaf/Sophia/Manuel/BrainAmpSeries/BrainAmpSeries.exe")
+        os.startfile(path)
+
+    def open_LabRecorder():
+        path = os.path.normpath("C:/Users/schlaf/Sophia/Manuel/LabRecorder-1.14.2-Win_amd64/LabRecorder/LabRecorder.exe")
+        os.startfile(path)
+
+    window.title("Wecome to youre BCI")
+    label1 = tk.Label(window, text="Install all Electrodes and connect them to the Amplifier")
+    label1.grid(row=0, column= 0)
+
+    label2 = tk.Label(window, text="Open BrainAmpSeries.exe connector, select #of electrodes and link it")
+    label2.grid(row=4, column= 0)
+    bnt1 = tk.Button(window, text="Open BrainAmpSeries.exe", command=open_BrainAmpLSL)
+    bnt1.grid(row =4, column= 1)
+
+    label3 = tk.Label(window, text="Open LabRecorder.exe, select the BrainAmp streams and Start the Stream")
+    label3.grid(row=8, column=0)
+    bnt2 = tk.Button(window, text="open_LabRecorder.exe", command= open_LabRecorder)
+    bnt2.grid(row=8, column=1)
+
+    label4 = tk.Label(window, text="Select you're Frequency Band for the BCI")
+    label4.grid(row=16, column=0)
+
+    input = "freq"
+    def set_frequency(frequency):
+        if input == "alpha":
+            frequency = 1
+        elif input == "theta":
+            frequency = 2
+        return frequency
+
+    selected = tk.IntVar
+    rad1= tk.Radiobutton(window, text="alpha (8 - 14 Hz", value = 1, variable = selected, command = set_frequency(input))
+    rad1.grid(row=20, column=0)
+    rad2= tk.Radiobutton(window, text="theta (4 - 8 Hz", value = 2, variable = selected, command = set_frequency(input))
+    rad2.grid(row=20, column=1)
+
+    print(input)
+    window.mainloop()
+
+main_gui()
