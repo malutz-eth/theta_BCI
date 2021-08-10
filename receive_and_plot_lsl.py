@@ -15,11 +15,11 @@ import pyqtgraph as pg
 import datetime
 import pickle
 import sys
+import GUI as gui
 
 from pyqtgraph.Qt import QtCore, QtGui
 from typing import List
-from scipy.signal import butter, lfilter, sosfilt
-
+from scipy.signal import butter, lfilter
 
 class Inlet:
     """Base class to represent a plottable inlet"""
@@ -57,13 +57,15 @@ class DataInlet(Inlet):
     should be plotted as multiple lines."""
     dtypes = [[], np.float32, np.float64, None, np.int32, np.int16, np.int8, np.int64]
 
-    #Frequencies for filter
-    hcut = 14 #Hz, upper Frequency boundary of the BCI
-    lcut = 8 #Hz, lower Frequncy boundery of the BCI
+    hcut = 14
+    lcut = 8
+
     filter_order = 5
 
     #sampling rate of the stream
     sr = 500
+
+    raw_data = []
 
     def __init__(self, info: pylsl.StreamInfo, plt: pg.PlotItem):
         super().__init__(info)
@@ -128,7 +130,7 @@ class DataInlet(Inlet):
                 y_raw = np.hstack((old_y[1:], y[new_offset:, ch_ix] - ch_ix))
 
                 #filtering of the data in the recomanded range
-                y_raw_filtered = band_pass_filter(y_raw, 1, 20, self.sr, self.filter_order)
+                y_raw_filtered = band_pass_filter(y_raw, 1, 15, self.sr, self.filter_order)
                 y_filtered = band_pass_filter(y_raw, self.lcut, self.hcut, self.sr, self.filter_order)
 
                 #self.curve_processed[ch_ix].setData(ts_axis, y_raw)
@@ -136,14 +138,18 @@ class DataInlet(Inlet):
                 self.curve_processed[ch_ix].setData(ts_axis, y_raw_filtered)
                 self.curve_filt[ch_ix].setData(ts_axis, y_filtered)
 
+                self.raw_data.append(y_raw.shape)
+
 def main():
+
+    gui.main_gui()
+
     """
     print("name of the participant?: ")
     name = input("")
     print("Which frequnecy is filtered?: ")
     freq_type = input("")
     """
-
     # firstly resolve all streams that could be shown
     inlets: List[Inlet] = []
     print("looking for streams")
@@ -192,30 +198,22 @@ def main():
     # Start Qt event loop unless running in interactive mode or using pyside.
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtGui.QApplication.instance().exec_()
-"""
-    #extract the numbers of the chunck and them together to a single array
-    for i in range(1,len(list_data)-1):
-        for j in range(0,len(list_data)):
-            list_raw_data.append(list_data[i][j])
-            #list_data_filtered.append(list_data_filt[i][j])
 
-
-    raw_data = np.asarray(list_raw_data)
-    filtered_data = np.asarray(list_data_filtered)
-
-    #save the raw eeg data in a dict with all the metha data, like name of participant freqency and
-
-    def data_saving(raw_data,filtered_data,name,freq_type):
+    def data_saving(raw_data,name,freq_type,list):
+        for i in range(0,len(DataInlet.raw_data)):
+            for j in range(0,len(DataInlet.raw_data[i])):
+                list.append(DataInlet.raw_data[i][j])
 
         date = (datetime.datetime.now())
         date_time = date.strftime("%m%d%Y%H%M")
-        data_raw = {"data_raw": raw_data, "data_fitered": filtered_data, "name": name,"frequeny_range": freq_type,"datetime": date}
+        data_raw = {"data_raw": raw_data, "name": name,"frequeny_range": freq_type,"datetime": date}
         a_file = open(name+date_time+".pkl", "wb")
         pickle.dump(data_raw, a_file)
-        a_file.close()
+        a_file.close(),
 
-    #data_saving(raw_data,filtered_data,name,freq_type)
-"""
+    raw_data_list = []
+    data_saving(DataInlet.raw_data,"name","alpha",raw_data_list)
+    print(raw_data_list)
 
 if __name__ == '__main__':
     main()
