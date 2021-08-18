@@ -7,7 +7,6 @@ It illustrates the following use cases:
 - automatically discarding older samples
 - online postprocessing
 """
-
 import numpy as np
 import math
 import pylsl
@@ -16,6 +15,11 @@ import datetime
 import pickle
 import sys
 import GUI as gui
+import keyboard
+import tkinter as tk
+import data_analysis as offline
+import os
+import window_buttns as btns
 
 from pyqtgraph.Qt import QtCore, QtGui
 from typing import List
@@ -26,8 +30,8 @@ class Inlet:
     # Basic parameters for the plotting window
 
     plot_duration = 8 # how many seconds of data to show
-    update_interval = 4  # ms between screen updates
-    pull_interval = 4  # ms between each pull operation
+    update_interval = 5  # ms between screen updates
+    pull_interval = 5  # ms between each pull operation
 
     def __init__(self, info: pylsl.StreamInfo):
         # create an inlet and connect it to the outlet we found earlier.
@@ -56,16 +60,24 @@ class DataInlet(Inlet):
     """A DataInlet represents an inlet with continuous, multi-channel data that
     should be plotted as multiple lines."""
     dtypes = [[], np.float32, np.float64, None, np.int32, np.int16, np.int8, np.int64]
+    data_list = []
 
-    hcut = 14
-    lcut = 8
+    timelist = []
+    timelist.append(pylsl.local_clock())
+
+    if gui.freq_option == 1:
+        freq_band = "alpha"
+        hcut = 14
+        lcut = 8
+    elif gui.freq_option == 2:
+        freq_band = "theta"
+        hcut = 8
+        lcut = 4
 
     filter_order = 5
 
     #sampling rate of the stream
     sr = 500
-
-    raw_data = []
 
     def __init__(self, info: pylsl.StreamInfo, plt: pg.PlotItem):
         super().__init__(info)
@@ -75,13 +87,12 @@ class DataInlet(Inlet):
         empty = np.array([])
         # create one curve object for each channel/line that will handle displaying the data
         self.curves = [pg.PlotCurveItem(x=empty, y=empty, autoDownsample=True, pen=(0.001)) for _ in range(self.channel_count)]
-        self.curve_filt = [pg.PlotCurveItem(x=empty, y=empty, autoDownsample=True,pen=(3),width=5)]
+        self.curve_filt = [pg.PlotCurveItem(x=empty, y=empty, autoDownsample=True,pen=pg.mkPen('g', width=5))]
         self.curve_processed = [pg.PlotCurveItem(x=empty, y=empty, autoDownsample=True)]
 
         plt.addItem(self.curves[0])
         plt.addItem(self.curve_processed[0])
         plt.addItem(self.curve_filt[0])
-
 
     def pull_and_plot(self, plot_time, plt):
 
@@ -130,26 +141,26 @@ class DataInlet(Inlet):
                 y_raw = np.hstack((old_y[1:], y[new_offset:, ch_ix] - ch_ix))
 
                 #filtering of the data in the recomanded range
-                y_raw_filtered = band_pass_filter(y_raw, 1, 15, self.sr, self.filter_order)
+                y_raw_filtered = band_pass_filter(y_raw, 1, 40, self.sr, self.filter_order)
                 y_filtered = band_pass_filter(y_raw, self.lcut, self.hcut, self.sr, self.filter_order)
 
                 #self.curve_processed[ch_ix].setData(ts_axis, y_raw)
                 self.curves[ch_ix].setData(ts_axis, y_raw)
                 self.curve_processed[ch_ix].setData(ts_axis, y_raw_filtered)
                 self.curve_filt[ch_ix].setData(ts_axis, y_filtered)
+                self.data_list.append(y_raw)
 
-                self.raw_data.append(y_raw.shape)
+                if keyboard.is_pressed("Enter"):
+                    btns.main(plot_time, self.timelist)
 
 def main():
-
-    gui.main_gui()
-
     """
     print("name of the participant?: ")
     name = input("")
     print("Which frequnecy is filtered?: ")
     freq_type = input("")
     """
+
     # firstly resolve all streams that could be shown
     inlets: List[Inlet] = []
     print("looking for streams")
@@ -157,6 +168,7 @@ def main():
 
     # Create the pyqtgraph window
     pw = pg.plot(title='LSL Plot')
+    pw.showMaximized()
     plt = pw.getPlotItem()
     plt.enableAutoRange(x=False, y=False)
 
@@ -199,21 +211,24 @@ def main():
     if (sys.flags.interactive != 1) or not hasattr(QtCore, 'PYQT_VERSION'):
         QtGui.QApplication.instance().exec_()
 
-    def data_saving(raw_data,name,freq_type,list):
-        for i in range(0,len(DataInlet.raw_data)):
-            for j in range(0,len(DataInlet.raw_data[i])):
-                list.append(DataInlet.raw_data[i][j])
-
+    def data_saving(list, session_title, name, freq_type, interact):
+        os.chdir(gui.path)
         date = (datetime.datetime.now())
         date_time = date.strftime("%m%d%Y%H%M")
-        data_raw = {"data_raw": raw_data, "name": name,"frequeny_range": freq_type,"datetime": date}
-        a_file = open(name+date_time+".pkl", "wb")
-        pickle.dump(data_raw, a_file)
-        a_file.close(),
+        data = {"data": list,"session_title": session_title , "name": name,"frequeny_range": freq_type,
+                    "datetime": date, "interactions": interact}
+        a_file = open(session_title+name+date_time+freq_type+".pkl", "wb")
+        pickle.dump(data, a_file)
+        a_file.close()
 
-    raw_data_list = []
-    data_saving(DataInlet.raw_data,"name","alpha",raw_data_list)
-    print(raw_data_list)
+    data_saving(DataInlet.data_list[-1], gui.session_name, gui.name, DataInlet.freq_band, DataInlet.timelist)
+    offline.main()
 
 if __name__ == '__main__':
+    # import cProfile, pstats
+    # profiler = cProfile.Profile()
+    # profiler.enable()
     main()
+    # profiler.disable()
+    # stats= pstats.Stats(profiler).sort_stats("tottime")
+    # stats.print_stats()
