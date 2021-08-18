@@ -1,50 +1,108 @@
 import tkinter as tk
 import os
+from tkinter.filedialog import askopenfile
+import os.path
 
-def main_gui():
-    window = tk.Tk()
-    window.geometry("1000x800")
+path = " "
+window = tk.Tk()
+window.geometry("1200x800")
 
-    def open_BrainAmpLSL():
-        path = os.path.normpath("C:/Users/schlaf/Sophia/Manuel/BrainAmpSeries/BrainAmpSeries.exe")
-        os.startfile(path)
+def open_BrainAmpLSL():
+    path = os.path.normpath("C:/Users/schlaf/Sophia/Manuel/BrainAmpSeries/BrainAmpSeries.exe")
+    os.startfile(path)
 
-    def open_LabRecorder():
-        path = os.path.normpath("C:/Users/schlaf/Sophia/Manuel/LabRecorder-1.14.2-Win_amd64/LabRecorder/LabRecorder.exe")
-        os.startfile(path)
+def open_LabRecorder():
+    path = os.path.normpath("C:/Users/schlaf/Sophia/Manuel/LabRecorder-1.14.2-Win_amd64/LabRecorder/LabRecorder.exe")
+    os.startfile(path)
 
-    window.title("Wecome to youre BCI")
-    label1 = tk.Label(window, text="Install all Electrodes and connect them to the Amplifier")
-    label1.grid(row=0, column= 0)
+def help_window1():
+   top=tk.Toplevel(window)
+   top.geometry("750x250")
+   top.title("Help 1")
+   tk.Label(top, text= 'Set "Number of Channels" to 1 and click "Link" ').place(x=50,y= 50)
 
-    label2 = tk.Label(window, text="Open BrainAmpSeries.exe connector, select #of electrodes and link it")
-    label2.grid(row=4, column= 0)
-    bnt1 = tk.Button(window, text="Open BrainAmpSeries.exe", command=open_BrainAmpLSL)
-    bnt1.grid(row =4, column= 1)
+def help_window2():
+   top=tk.Toplevel(window)
+   top.geometry("750x250")
+   top.title("Help 1")
+   tk.Label(top, text= 'Select all Streams in the left box and click on "START" ').place(x=50,y= 50)
 
-    label3 = tk.Label(window, text="Open LabRecorder.exe, select the BrainAmp streams and Start the Stream")
-    label3.grid(row=8, column=0)
-    bnt2 = tk.Button(window, text="open_LabRecorder.exe", command= open_LabRecorder)
-    bnt2.grid(row=8, column=1)
+def Close_and_start():
+    window.destroy()
 
-    label4 = tk.Label(window, text="Select you're Frequency Band for the BCI")
-    label4.grid(row=16, column=0)
+def saveFile():
+    global path
+    path = tk.filedialog.askdirectory()
 
-    input = "freq"
-    def set_frequency(frequency):
-        if input == "alpha":
-            frequency = 1
-        elif input == "theta":
-            frequency = 2
-        return frequency
+window.title("Wecome to youre BCI")
+label = tk.Label(window,font=("Courier", 12), text="1. Install all Electrodes and connect them to the Amplifier ")
+label.grid(row=0, column= 0)
 
-    selected = tk.IntVar
-    rad1= tk.Radiobutton(window, text="alpha (8 - 14 Hz", value = 1, variable = selected, command = set_frequency(input))
-    rad1.grid(row=20, column=0)
-    rad2= tk.Radiobutton(window, text="theta (4 - 8 Hz", value = 2, variable = selected, command = set_frequency(input))
-    rad2.grid(row=20, column=1)
+label1 = tk.Label(window,font=("Courier", 12), text="2. After connect LSL to the Computer minimize all Windows")
+label1.grid(row=1, column= 0)
 
-    print(input)
-    window.mainloop()
+#Handling the connection of BrainAmp amplifier with the LSL system
+label2 = tk.Label(window, text="3. Open BrainAmpSeries LSL connector, select #of electrodes and link it     ",
+                  font=("Courier", 12))
+label2.grid(row=10, column= 0)
+bnt1 = tk.Button(window, text="Open BrainAmpSeries ",bg = "green", fg = "white",
+                 height=5, width=20, command=open_BrainAmpLSL)
+bnt1.grid(row =10, column= 1)
 
-main_gui()
+help_btn1 = tk.Button(window, text="I don't know how",height=5, width=20, command=help_window1)
+help_btn1.grid(row=10, column=2)
+
+#Handling the connection of the BrainAmp stream output with the Labrecorder
+label3 = tk.Label(window, text="4. Open LabRecorder, select the BrainAmp streams and Start the Stream",
+                  font=("Courier", 12))
+label3.grid(row=20, column=0)
+bnt2 = tk.Button(window, text="Open LabRecorder",bg = "green", fg = "white",
+                 height=5, width=20, command=open_LabRecorder)
+bnt2.grid(row=20, column=1)
+
+help_btn2 = tk.Button(window, text="I don't know how",height=5, width=20, command=help_window2)
+help_btn2.grid(row=20, column=2)
+
+#Save the measured file into a selected folder
+fileBtn = tk.Button(window, text="Save file to: ",bg = "green", fg = "white",
+                    height=5, width=20, command=saveFile)
+fileBtn.grid(row=25, column=0)
+
+#Select the frequency range of the neurofeedback
+label4 = tk.Label(window, text="5. Select you're Frequency Band for the BCI",
+                  font=("Courier", 12))
+label4.grid(row=30, column=0)
+
+selected = tk.IntVar()
+rad1= tk.Radiobutton(window, text="alpha (8 - 14 Hz)", value=1, variable=selected)
+rad1.grid(row=40, column=0)
+rad2= tk.Radiobutton(window, text="theta (4 - 8 Hz)", value=2, variable=selected)
+rad2.grid(row=40, column=1)
+
+#Add the name of the participant
+name_var = tk.StringVar()
+ent_name = tk.Entry(window, width=30, textvariable=name_var)
+lbl_name = tk.Label(window, text="6. Enter Name of the participant: ",
+                    font=("Courier", 12))
+ent_name.grid(row=50, column=1)
+lbl_name.grid(row=50, column=0)
+
+#Add the name of the session
+session_title = tk.StringVar()
+ent_name = tk.Entry(window, width=30, textvariable=session_title)
+lbl_name = tk.Label(window, text="7. Enter the Session name/title: ",
+                    font=("Courier", 12))
+ent_name.grid(row=100, column=1)
+lbl_name.grid(row=100, column=0)
+
+label3 = tk.Label(window,font=("Courier", 12), text="The BCI measurement will stop and save all data, if you close the window")
+label3.grid(row=0, column= 0)
+
+btn_go = tk.Button(window, text="Start Neurofeedback-Session",bg = "green", fg = "white",
+                   height=5, width=30, command=Close_and_start)
+btn_go.grid(row=150, column= 0)
+
+window.mainloop()
+freq_option = selected.get()
+name = name_var.get()
+session_name = session_title.get()
