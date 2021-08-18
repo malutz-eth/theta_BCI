@@ -1,0 +1,75 @@
+import pickle
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+import biosppy as biosppy
+import pandas as pd
+import GUI as gui
+
+from scipy.signal import butter, lfilter
+from scipy import signal
+
+def main():
+    list_files = []
+    sr = 500 #Hz
+
+    if gui.freq_option == 1:
+        hcut = 14
+        lcut = 8
+    elif gui.freq_option == 2:
+        hcut = 8
+        lcut = 4
+
+    for filename in os.listdir(gui.path):
+        if filename.endswith(".pkl"):
+            with open(filename,"rb") as f:
+                list_files.append(pickle.load(f))
+            continue
+        else:
+            continue
+    for i in range(0,len(list_files)):
+        eeg_raw_data = list_files[i]["data"]
+        print(list_files[i]["session_title"])
+        plt.plot(eeg_raw_data)
+        plt.show()
+        interactions = list_files[i]["interactions"]
+        interactionspoints = []
+
+        for i in interactions[1:len(interactions)-1:2]:
+            interactionspoints.append(sr*i+4000)
+
+        def band_pass_filter(list,low_cutoff,high_cutoff,fs,order=5):
+                    nyq = 0.5 * fs
+                    low = low_cutoff/nyq
+                    high = high_cutoff / nyq
+                    b, a = butter(order,[low,high],btype='band')
+                    list1 = lfilter(b,a,list)
+                    return list1
+
+        eeg_filtered = band_pass_filter(eeg_raw_data,lcut,hcut,sr,order =5)
+        eeg_raw = band_pass_filter(eeg_raw_data,1,45,sr,5)
+        fig, ax = plt.subplots(figsize=(12, 6))
+        ax.plot(eeg_raw, color ="blue")
+        ax.plot(eeg_filtered, color="red")
+        ax.vlines(interactionspoints, 0, 1, linestyles='dashed', colors='red',transform = ax.get_xaxis_transform())
+        plt.show()
+
+        freqs, psd = signal.welch(eeg_raw_data, fs=sr)
+        plt.plot(freqs,psd)
+        plt.title("PSD of EEG_signal")
+        plt.xlabel("Frequency")
+        plt.ylabel("Power Spectrum Desnity")
+        plt.tight_layout()
+        plt.show()
+
+        freqs, psd = signal.welch(eeg_raw_data, fs=sr)
+        plt.plot(freqs[2:14], psd[2:14])
+        plt.title("PSD of EEG_signal in Frequency range")
+        plt.xlabel("Frequency")
+        plt.ylabel("Power Spectrum Density")
+        plt.tight_layout()
+        plt.show()
+
+        raw_data = pd.DataFrame({"data_raw": eeg_raw})
+        eeg = np.asarray(raw_data)
+        #eeg_analysis = biosppy.eeg.eeg(eeg,sampling_rate=1000,labels=None,show=True)
