@@ -16,8 +16,6 @@ import pickle
 import sys
 import GUI as gui
 import keyboard
-import tkinter as tk
-import data_analysis as offline
 import os
 import window_buttns as btns
 
@@ -29,9 +27,9 @@ class Inlet:
     """Base class to represent a plottable inlet"""
     # Basic parameters for the plotting window
 
-    plot_duration = 8 # how many seconds of data to show
-    update_interval = 5  # ms between screen updates
-    pull_interval = 5  # ms between each pull operation
+    plot_duration = 10 # how many seconds of data to show
+    update_interval = 10  # ms between screen updates
+    pull_interval = 10  # ms between each pull operation
 
     def __init__(self, info: pylsl.StreamInfo):
         # create an inlet and connect it to the outlet we found earlier.
@@ -60,7 +58,11 @@ class DataInlet(Inlet):
     """A DataInlet represents an inlet with continuous, multi-channel data that
     should be plotted as multiple lines."""
     dtypes = [[], np.float32, np.float64, None, np.int32, np.int16, np.int8, np.int64]
-    data_list = []
+    data_buffer_list = []
+    time_buffer_list = []
+
+    data_buffer = np.asarray(data_buffer_list)
+    time_buffer = np.empty(time_buffer_list)
 
     timelist = []
     timelist.append(pylsl.local_clock())
@@ -86,12 +88,10 @@ class DataInlet(Inlet):
         self.buffer = np.empty(bufsize, dtype=self.dtypes[info.channel_format()])
         empty = np.array([])
         # create one curve object for each channel/line that will handle displaying the data
-        self.curves = [pg.PlotCurveItem(x=empty, y=empty, autoDownsample=True, pen=(0.001)) for _ in range(self.channel_count)]
+        self.curves = [pg.PlotCurveItem(x=empty, y=empty, autoDownsample=True) for _ in range(self.channel_count)]
         self.curve_filt = [pg.PlotCurveItem(x=empty, y=empty, autoDownsample=True,pen=pg.mkPen('g', width=5))]
-        self.curve_processed = [pg.PlotCurveItem(x=empty, y=empty, autoDownsample=True)]
 
         plt.addItem(self.curves[0])
-        plt.addItem(self.curve_processed[0])
         plt.addItem(self.curve_filt[0])
 
     def pull_and_plot(self, plot_time, plt):
@@ -109,49 +109,38 @@ class DataInlet(Inlet):
             return data_filt_hp
 
         # pull the data
-        _, ts = self.inlet.pull_chunk(timeout=0.0,
-                                      max_samples=self.buffer.shape[0],
-                                      dest_obj=self.buffer)
+        samples, ts = self.inlet.pull_chunk()
+        if ts:
+            samples = np.asarray(samples)
+            samples = samples.flatten()
 
         # ts will be empty if no samples were pulled, a list of timestamps otherwise
-        if ts:
+
             ts = np.asarray(ts)
-            y = self.buffer[0:ts.size, :]
+            ts = ts.flatten()
 
-            ts_axis = None
-            old_offset = 0
-            new_offset = 0
-            for ch_ix in range(self.channel_count):
-                # we don't pull an entire screen's worth of data, so we have to
-                # trim the old data and append the new data to it
-                old_x, old_y = self.curves[0].getData()
+            self.data_buffer = np.append(self.data_buffer, samples)
+            self.time_buffer = np.append(self.time_buffer, ts)
+            if len(self.data_buffer) < 10000:
 
-                # the timestamps are identical for all channels, so we need to do
-                # this calculation only once
-                if ch_ix == 0:
-                    # find the index of the first sample that's still visible,
-                    # i.e. newer than the left border of the plot
-                    old_offset = old_x.searchsorted(plot_time)
-                    # same for the new data, in case we pulled more data than
-                    # can be shown at once
-                    new_offset = ts.searchsorted(plot_time)
-                    # append new timestamps to the trimmed old timestamps
-                    ts_axis = np.hstack((old_x[1:], ts[new_offset:]))
-                # append new data to the trimmed old data
-                y_raw = np.hstack((old_y[1:], y[new_offset:, ch_ix] - ch_ix))
+                filt = band_pass_filter(self.data_buffer[-(self.sr*Inlet.plot_duration)-1:-1], self.lcut, self.hcut, self.sr, self.filter_order)
+                raw = band_pass_filter(self.data_buffer[-(self.sr*Inlet.plot_duration)-1:-1], 1, 35, self.sr, self.filter_order)
 
-                #filtering of the data in the recomanded range
-                y_raw_filtered = band_pass_filter(y_raw, 1, 40, self.sr, self.filter_order)
-                y_filtered = band_pass_filter(y_raw, self.lcut, self.hcut, self.sr, self.filter_order)
+                self.curves[0].setData(self.time_buffer[-len(raw)-1:-1], raw)
+                self.curve_filt[0].setData(self.time_buffer[-len(raw)-1:-1], filt)
 
-                #self.curve_processed[ch_ix].setData(ts_axis, y_raw)
-                self.curves[ch_ix].setData(ts_axis, y_raw)
-                self.curve_processed[ch_ix].setData(ts_axis, y_raw_filtered)
-                self.curve_filt[ch_ix].setData(ts_axis, y_filtered)
-                self.data_list.append(y_raw)
+            else:
+                filt = band_pass_filter(self.data_buffer[-(self.sr*Inlet.plot_duration)*2-1:-1], self.lcut, self.hcut, self.sr, self.filter_order)
+                raw = band_pass_filter(self.data_buffer[-(self.sr*Inlet.plot_duration)*2-1:-1], 1, 35, self.sr, self.filter_order)
 
-                if keyboard.is_pressed("Enter"):
-                    btns.main(plot_time, self.timelist)
+                raw = raw[-round(0.5*(len(raw))):-1]
+                filt = filt[-round(0.5*(len(filt))):-1]
+
+                self.curves[0].setData(self.time_buffer[-len(raw)-1:-1], raw)
+                self.curve_filt[0].setData(self.time_buffer[-len(raw)-1:-1], filt)
+
+            if keyboard.is_pressed("Enter"):
+                btns.main(plot_time, self.timelist)
 
 def main():
     """
@@ -171,6 +160,7 @@ def main():
     pw.showMaximized()
     plt = pw.getPlotItem()
     plt.enableAutoRange(x=False, y=False)
+    pw.showGrid(x=True,y=True)
 
     # iterate over found streams, creating specialized inlet objects that will
     # handle plotting the data
@@ -221,14 +211,7 @@ def main():
         pickle.dump(data, a_file)
         a_file.close()
 
-    data_saving(DataInlet.data_list[-1], gui.session_name, gui.name, DataInlet.freq_band, DataInlet.timelist)
-    offline.main()
+    data_saving(inlets[0].data_buffer, gui.session_name, gui.name, DataInlet.freq_band, DataInlet.timelist)
 
 if __name__ == '__main__':
-    # import cProfile, pstats
-    # profiler = cProfile.Profile()
-    # profiler.enable()
-    main()
-    # profiler.disable()
-    # stats= pstats.Stats(profiler).sort_stats("tottime")
-    # stats.print_stats()
+        main()
