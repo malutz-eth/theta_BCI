@@ -1,0 +1,61 @@
+import pickle
+import os
+from scipy.signal import butter, lfilter
+from scipy.fft import fft, fftfreq
+import matplotlib.pyplot as plt
+import GUI as gui
+
+list_files = []
+data_list = []
+session_list = []
+filtered_datas = []
+os.chdir(gui.path)
+
+for filename in os.listdir(gui.path):
+    if filename.endswith(".pkl"):
+        with open(filename, "rb") as f:
+            list_files.append(pickle.load(f))
+        continue
+    else:
+        continue
+
+for i in range(0,len(list_files)):
+    data_list.append(list_files[i]["data"])
+    session_list.append(list_files[i]["session_title"])
+
+def filter_function(data,cutfreq,fs,order,btype):
+    nyq = fs*0.5
+    cutfreq= cutfreq/nyq
+    b, a = butter(order, cutfreq, btype=btype, analog=False)
+    filt = lfilter(b,a,data)
+    return filt
+
+def band_pass_filter(data, l, h, fs, order):
+    data_filt_lp = filter_function(data, h, fs, order, "low")
+    data_filt_hp = filter_function(data_filt_lp, l, fs, order, "high")
+    return data_filt_hp
+
+
+for j in range(0,len(data_list)):
+    filtered_datas.append(band_pass_filter(data_list[j],1,40,500,5))
+
+for i in range(len(data_list)):
+    plt.plot(filtered_datas[i], label=session_list[i])
+
+plt.legend()
+plt.ylabel("Amplitude")
+plt.xlabel("samples")
+plt.title("Pre-processed Datas")
+plt.savefig("Pre-processed Datas.png")
+plt.show()
+
+#makin fft of all raw datas and plot it in the range of 2 to 16 Hz
+for i in range(len(data_list)):
+    plt.plot(abs(fftfreq(len(data_list[i]), 1/500)), abs(fft(data_list[i])), label=session_list[i])
+
+plt.legend()
+plt.ylabel("Amplitude")
+plt.xlabel("samples")
+plt.title("Frequency of sessions")
+plt.savefig("freq_plot.png")
+plt.show()
