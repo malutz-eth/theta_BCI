@@ -20,12 +20,13 @@ import os
 import window_buttns as btns
 import pygame
 import matplotlib.pyplot as plot
-from array import array
+from random import gauss
+from pygame import mixer
 
 from pyqtgraph.Qt import QtCore, QtGui
 from typing import List
-from scipy.signal import butter, lfilter
-from pygame.mixer import Sound, get_init, pre_init
+from scipy.signal import butter, lfilter, savgol_filter
+
 
 class Inlet:
     """Base class to represent a plottable inlet"""
@@ -112,6 +113,7 @@ class DataInlet(Inlet):
             data_filt_hp = filter_function(data_filt_lp, l, fs, order, "high")
             return data_filt_hp
 
+
         # pull the data
         samples, ts = self.inlet.pull_chunk()
 
@@ -141,61 +143,27 @@ class DataInlet(Inlet):
                 raw = raw[-round(0.5*(len(raw))):-1]
                 filt = filt[-round(0.5*(len(filt))):-1]
 
+
                 #mean = abs(np.mean(filt[-50:-1]))
                 value = abs(np.max(filt[-50:-1]))
-
 
                 self.curves[0].setData(self.time_buffer[-len(raw)-1:-1], raw)
                 self.curve_filt[0].setData(self.time_buffer[-len(raw)-1:-1], filt)
 
                 #Create an Audio signal which than can be controlled by the frequency of the neurofeedback
-                sampleRate = 44100
-                freq = 400
-
-                """
-                class Note(Sound):
-
-                    def __init__(self, frequency, volume):
-                        self.frequency = frequency
-                        Sound.__init__(self, self.build_samples())
-                        self.set_volume(volume)
-
-                    def build_samples(self):
-                        period = int(round(get_init()[0] / self.frequency))
-                        samples = array("h", [0] * period)
-                        amplitude = 2 ** (abs(get_init()[1]) - 1) - 1
-                        for time in range(period):
-                            if time < period / 2:
-                                samples[time] = amplitude
-                            else:
-                                samples[time] = -amplitude
-                        return samples
-
-                pre_init(44100, -16, 1, 1024)
-                pygame.init()
-
-                Note(300, (round(1 / value), 3)).play(-1)
 
                 """
                 pygame.mixer.init(44100, -16, 2, 512)
-                arr = np.array([2048 * np.sin(2.0 * np.pi * freq * x / sampleRate) for x in range(0, sampleRate)]).astype(np.int16)
-                arr2 = np.c_[arr,arr]
+                noise = np.array([2048 * gauss(0.0, 1) for x in range(0, 44100)]).astype(np.int16)
+                arr2 = np.c_[noise, noise]
                 sound = pygame.sndarray.make_sound(arr2)
+                pygame.mixer.Sound(sound)
                 sound.play(-1)
-                sound.set_volume(0.1)
-                pygame.time.delay(0)
-
-                if  value > 10:
-                    pygame.mixer.pause()
-                    #sound.set_volume(0.01)
 
 
-                else:
-                    pygame.mixer.unpause()
-                    #sound.set_volume(0.9)
-                    
-
-
+                print(sound.get_volume())
+                """
+                pygame.mixer.music.set_volume(1/value)
 
             if keyboard.is_pressed("Enter"):
                         btns.main(plot_time, self.timelist)
@@ -207,6 +175,9 @@ def main():
     print("Which frequnecy is filtered?: ")
     freq_type = input("")
     """
+    pygame.init()
+    mixer.music.load("background.wav")
+    mixer.music.play(-1)
 
     # firstly resolve all streams that could be shown
     inlets: List[Inlet] = []
@@ -217,7 +188,7 @@ def main():
     pw = pg.plot(title='LSL Plot')
     pw.showMaximized()
     plt = pw.getPlotItem()
-    plt.enableAutoRange(x=False, y=True)
+    plt.enableAutoRange(x=False, y=False)
     pw.showGrid(x=True,y=True)
 
     # iterate over found streams, creating specialized inlet objects that will
@@ -272,9 +243,26 @@ def main():
 
     data_saving(inlets[0].data_buffer, gui.session_name, gui.name, DataInlet.freq_band, DataInlet.timelist)
 
-    plot.plot(inlets[0].data_buffer)
-    plot.show()
+    eventlist = []
+    eventnamelist=[]
 
+    eventlist.append(DataInlet.timelist[1::2])
+    eventnamelist.append(DataInlet.timelist[2::2])
+    eventname = ["","Sleepiness", "Black Mind", "Wakefullness", "Internal Attention", "External Attention",
+                "Mind Wandering", "Engagement", "Ohters"]
+    events  = []
+    for i in range(0, len(eventnamelist[0])):
+        events.append(eventname[eventnamelist[0][i]])
+
+    print(eventlist)
+    print(events)
+
+    plot.plot(inlets[0].data_buffer)
+
+    for p in range(0,len(eventlist[0])):
+        plot.axvline((eventlist[0][p]+9)*500, label=events[p], color = "red")
+        plot.legend()
+    plot.show()
 
 if __name__ == '__main__':
         main()
